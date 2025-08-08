@@ -299,6 +299,7 @@ func TestConfig_Validation(t *testing.T) {
 					return fmt.Errorf("server port must be >= 1024")
 				}
 			}
+
 			return nil
 		},
 	}
@@ -692,6 +693,7 @@ func TestNewWithOptions(t *testing.T) {
 	// Test New with valid option
 	validOption := func(c *Config) error {
 		c.Set("option_key", "option_value")
+
 		return nil
 	}
 
