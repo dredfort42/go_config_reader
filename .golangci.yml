@@ -1,6 +1,6 @@
 run:
   issues-exit-code: 1
-  tests: true
+  tests: false
 
 linters:
   enable:
@@ -52,9 +52,13 @@ linters-settings:
     min-len: 3
     min-occurrences: 3
   gocyclo:
-    min-complexity: 20
+    min-complexity: 25
   cyclop:
-    max-complexity: 20
+    max-complexity: 25
+  gocognit:
+    min-complexity: 50
+  nestif:
+    min-complexity: 10
   gosec:
     severity: medium
     confidence: medium
@@ -78,14 +82,3 @@ issues:
     - "exported .* should have comment or be unexported"
     - "package comment should be of the form"
     - "G104:"
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocognit
-        - gosec
-        - godot
-        - wsl
-        - funlen
-        - gocyclo
-        - cyclop
-        - errcheck

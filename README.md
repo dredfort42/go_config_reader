@@ -9,11 +9,12 @@ A modern, flexible, and thread-safe configuration library for Go applications th
 -   **Thread-Safe**: Concurrent access protection with RWMutex
 -   **Type Safety**: Strong typing with automatic type conversion
 -   **Default Values**: Built-in support for default values
+-   **Nested Configuration**: Dot notation access for nested structures
 -   **Validation**: Custom validation functions and required key checking
--   **Global and Instance APIs**: Both convenience global functions and instance-based configuration
+-   **Instance-Based API**: Clean instance-based configuration management
 -   **Minimal Dependencies**: Only requires `gopkg.in/yaml.v3` for YAML support
 -   **High Performance**: Optimized for speed with comprehensive benchmarks
--   **Well Tested**: 96.6% test coverage with comprehensive test suite
+-   **Well Tested**: Comprehensive test suite with extensive coverage
 
 ## Installation
 
@@ -54,33 +55,6 @@ func main() {
     name := cfg.GetString("app_name", "MyApp")
 
     fmt.Printf("Server: %s running on port %d (debug: %v)\n", name, port, debug)
-}
-```
-
-### Using Global Instance (Simple API)
-
-```go
-package main
-
-import (
-    "log"
-
-    config "github.com/dredfort42/go_config_reader"
-)
-
-func main() {
-    // Load configuration into global instance
-    err := config.Load("config.json", nil)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Use simple getters
-    port := config.GetInt("server_port", 8080)
-    debug := config.GetBool("debug_mode", false)
-
-    // Set values at runtime
-    config.Set("runtime_value", "test")
 }
 ```
 
@@ -130,70 +104,6 @@ timeout=30
 db_host=localhost
 db_port=5432
 db_name=myapp
-```
-
-## Advanced Usage
-
-### LoadOptions Structure
-
-```go
-type LoadOptions struct {
-    Format         Format                              // FormatJSON, FormatYAML, FormatINI (auto-detected from extension if not specified)
-    IgnoreEnv      bool                                // If true, skip environment variable override
-    RequiredKeys   []string                            // Keys that must be present after loading
-    DefaultValues  map[string]interface{}              // Default values applied before loading file
-    ValidationFunc func(map[string]interface{}) error  // Custom validation function
-}
-```
-
-### Loading with Options
-
-```go
-cfg, err := config.New()
-if err != nil {
-    log.Fatal(err)
-}
-
-opts := &config.LoadOptions{
-    DefaultValues: map[string]interface{}{
-        "server_port": 8080,
-        "debug_mode":  false,
-        "timeout":     "30s",
-    },
-    RequiredKeys: []string{"database_url", "api_key"},
-    ValidationFunc: func(data map[string]interface{}) error {
-        if port, ok := data["server_port"]; ok {
-            if portInt, ok := port.(int); ok && portInt < 1024 {
-                return fmt.Errorf("server port must be >= 1024")
-            }
-        }
-        return nil
-    },
-}
-
-err = cfg.LoadFromFile("config.json", opts)
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-### Must Load (Panic on Error)
-
-```go
-// Panics if configuration cannot be loaded
-cfg := config.MustLoad("config.json", nil)
-```
-
-### Load with Defaults
-
-```go
-defaults := map[string]interface{}{
-    "server_port": 8080,
-    "debug_mode":  false,
-    "timeout":     "30s",
-}
-
-cfg := config.LoadWithDefaults("config.json", defaults)
 ```
 
 ## Data Types
@@ -287,20 +197,6 @@ fmt.Printf("Configuration has %d keys\n", size)
 fmt.Println(cfg.String())
 ```
 
-### Global API Functions
-
-```go
-// Global convenience functions (use shared global instance)
-config.Set("key", "value")
-value := config.GetString("key", "default")
-exists := config.Has("key")
-keys := config.Keys()
-configStr := config.String()
-
-// Load into global instance
-err := config.Load("config.json", nil)
-```
-
 ## Thread Safety
 
 The library is fully thread-safe and can be used in concurrent applications:
@@ -340,38 +236,44 @@ cfg.GetBool(key, defaultValue...)
 cfg.GetDuration(key, defaultValue...)
 cfg.GetStringSlice(key, defaultValue...)
 
+// Advanced getters
+cfg.GetNestedMap(key)
+cfg.GetNestedKeys(prefix)
+cfg.GetAll()
+
 // Setting and checking values
 cfg.Set(key, value)
+cfg.SetNestedDefaults(defaults)
 cfg.Has(key)
 
 // Utility methods
 cfg.Keys()
-cfg.GetAll()
 cfg.Size()
 cfg.IsEmpty()
 cfg.Clear()
 cfg.String()
 ```
 
-### Global Functions
+### LoadOptions Structure
 
 ```go
-// Convenience functions using global instance
-config.Load(filePath, opts)
-config.MustLoad(filePath, opts)
-config.LoadWithDefaults(filePath, defaults)
+type LoadOptions struct {
+    Format         Format                     // Configuration file format (auto-detected if not specified)
+    IgnoreEnv      bool                       // If true, skip environment variable override
+    RequiredKeys   []string                   // Keys that must be present after loading
+    DefaultValues  map[string]any             // Default values applied before loading file
+    ValidationFunc func(map[string]any) error // Custom validation function
+}
+```
 
-// Global getters/setters
-config.Set(key, value)
-config.GetString(key, defaultValue...)
-config.GetInt(key, defaultValue...)
-config.GetFloat64(key, defaultValue...)
-config.GetBool(key, defaultValue...)
-config.GetDuration(key, defaultValue...)
-config.GetStringSlice(key, defaultValue...)
-config.Has(key)
-config.Keys()
-config.String()
+### Supported Formats
+
+```go
+const (
+    FormatINI Format = iota
+    FormatJSON
+    FormatYAML
+)
 ```
 
 ## Error Handling
@@ -394,15 +296,15 @@ if err != nil {
 }
 ```
 
-## Best Practices
+## Examples
 
-1. **Use Structured Configuration**: Prefer JSON/YAML over INI for complex configurations
-2. **Environment Variables**: Use environment variables for deployment-specific values (they override file values when key names match)
-3. **Default Values**: Always provide sensible defaults using the optional default parameters
-4. **Validation**: Use validation functions for critical configuration values
-5. **Type Safety**: Use specific getter methods rather than accessing raw data
-6. **Error Handling**: Always check errors when loading configuration files
-7. **Thread Safety**: The library is thread-safe, safe to use in concurrent applications
+Comprehensive examples are available in the [`examples/`](examples/) directory:
+
+-   **[Basic Examples](examples/main.go)**: Complete feature demonstration
+-   **[HTTP Server Configuration](examples/server/main.go)**: Real-world server setup
+-   **[Microservice Configuration](examples/microservice/main.go)**: Advanced microservice config
+
+Each example includes detailed comments and demonstrates different aspects of the library.
 
 ## Requirements
 

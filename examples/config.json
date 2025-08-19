@@ -1,20 +1,12 @@
 {
-    "server": {
-        "host": "localhost",
-        "port": 8080,
-        "debug": true
-    },
-    "database": {
-        "host": "db.example.com",
-        "port": 5432,
-        "name": "myapp",
-        "ssl": false
-    },
-    "features": [
-        "auth",
-        "api",
-        "web"
-    ],
-    "timeout": "30s",
-    "max_connections": 100
+  "app_name": "JsonApp",
+  "server_port": 8080,
+  "debug_mode": true,
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "jsonapp"
+  },
+  "features": ["auth", "api", "web"],
+  "timeout": "30s"
 }

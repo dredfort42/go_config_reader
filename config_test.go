@@ -7,7 +7,7 @@
 	::::::::::::::::::::::
 	::  ::::::::::::::  ::    File     | config_test.go
 	::  ::          ::  ::    Created  | 2025-08-07
-		  ::::  ::::          Modified | 2025-08-07
+		  ::::  ::::          Modified | 2025-08-19
 
 	GitHub:   https://github.com/dredfort42
 	LinkedIn: https://linkedin.com/in/novikov-da
@@ -419,184 +419,6 @@ func TestConfig_GetAll(t *testing.T) {
 	assert.False(t, c.Has("key3"))
 }
 
-func TestGlobalAPI(t *testing.T) {
-	// Test the global API functions
-	Set("global_key", "global_value")
-	assert.True(t, Has("global_key"))
-	assert.Equal(t, "global_value", GetString("global_key"))
-
-	Set("global_int", 123)
-	assert.Equal(t, 123, GetInt("global_int"))
-
-	Set("global_bool", true)
-	assert.True(t, GetBool("global_bool"))
-
-	keys := Keys()
-	assert.Contains(t, keys, "global_key")
-	assert.Contains(t, keys, "global_int")
-	assert.Contains(t, keys, "global_bool")
-}
-
-func TestMustLoad(t *testing.T) {
-	configData := map[string]interface{}{
-		"server_port": 8080,
-		"debug_mode":  true,
-	}
-
-	jsonData, err := json.Marshal(configData)
-	require.NoError(t, err)
-
-	tempFile, err := os.CreateTemp("", "config_*.json")
-	require.NoError(t, err)
-	defer os.Remove(tempFile.Name())
-
-	_, err = tempFile.Write(jsonData)
-	require.NoError(t, err)
-	tempFile.Close()
-
-	// Should not panic with valid config
-	c := MustLoad(tempFile.Name(), nil)
-	assert.NotNil(t, c)
-	assert.Equal(t, 8080, c.GetInt("server_port"))
-
-	// Should panic with invalid file
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Expected MustLoad to panic with invalid file")
-		}
-	}()
-	MustLoad("/non/existent/file.json", nil)
-}
-
-func TestLoadWithDefaults(t *testing.T) {
-	configData := map[string]interface{}{
-		"server_port": 8080,
-	}
-
-	jsonData, err := json.Marshal(configData)
-	require.NoError(t, err)
-
-	tempFile, err := os.CreateTemp("", "config_*.json")
-	require.NoError(t, err)
-	defer os.Remove(tempFile.Name())
-
-	_, err = tempFile.Write(jsonData)
-	require.NoError(t, err)
-	tempFile.Close()
-
-	defaults := map[string]interface{}{
-		"debug_mode":  true,
-		"timeout":     30,
-		"server_port": 9090, // Should be overridden by file
-	}
-
-	c := LoadWithDefaults(tempFile.Name(), defaults)
-	assert.Equal(t, 8080, c.GetInt("server_port")) // From file
-	assert.True(t, c.GetBool("debug_mode"))        // From defaults
-	assert.Equal(t, 30, c.GetInt("timeout"))       // From defaults
-}
-
-func BenchmarkConfig_GetString(b *testing.B) {
-	c, _ := New()
-	c.Set("test_key", "test_value")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = c.GetString("test_key")
-	}
-}
-
-func BenchmarkConfig_GetInt(b *testing.B) {
-	c, _ := New()
-	c.Set("test_key", 42)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = c.GetInt("test_key")
-	}
-}
-
-// Tests for compatibility.go functions with 0% coverage
-func TestGlobalGetFloat64(t *testing.T) {
-	Set("float_key", 3.14)
-	assert.Equal(t, 3.14, GetFloat64("float_key"))
-
-	Set("float_string", "2.71")
-	assert.Equal(t, 2.71, GetFloat64("float_string"))
-
-	assert.Equal(t, 1.5, GetFloat64("non_existent", 1.5))
-	assert.Equal(t, 0.0, GetFloat64("non_existent"))
-}
-
-func TestGlobalGetDuration(t *testing.T) {
-	Set("duration_key", "30s")
-	assert.Equal(t, 30*time.Second, GetDuration("duration_key"))
-
-	Set("duration_int", 60)
-	assert.Equal(t, 60*time.Second, GetDuration("duration_int"))
-
-	defaultDur := 5 * time.Minute
-	assert.Equal(t, defaultDur, GetDuration("non_existent", defaultDur))
-	assert.Equal(t, time.Duration(0), GetDuration("non_existent"))
-}
-
-func TestGlobalGetStringSlice(t *testing.T) {
-	Set("slice_key", []string{"a", "b", "c"})
-	assert.Equal(t, []string{"a", "b", "c"}, GetStringSlice("slice_key"))
-
-	Set("csv_key", "x,y,z")
-	assert.Equal(t, []string{"x", "y", "z"}, GetStringSlice("csv_key"))
-
-	defaultSlice := []string{"default1", "default2"}
-	assert.Equal(t, defaultSlice, GetStringSlice("non_existent", defaultSlice))
-	assert.Equal(t, []string{}, GetStringSlice("non_existent"))
-}
-
-func TestGlobalLoad(t *testing.T) {
-	configData := map[string]interface{}{
-		"test_key": "test_value",
-		"port":     8080,
-	}
-
-	jsonData, err := json.Marshal(configData)
-	require.NoError(t, err)
-
-	tempFile, err := os.CreateTemp("", "config_*.json")
-	require.NoError(t, err)
-	defer os.Remove(tempFile.Name())
-
-	_, err = tempFile.Write(jsonData)
-	require.NoError(t, err)
-	tempFile.Close()
-
-	err = Load(tempFile.Name(), nil)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "test_value", GetString("test_key"))
-	assert.Equal(t, 8080, GetInt("port"))
-
-	// Test Load with options
-	opts := &LoadOptions{
-		DefaultValues: map[string]interface{}{
-			"default_key": "default_value",
-		},
-	}
-	err = Load(tempFile.Name(), opts)
-	assert.NoError(t, err)
-	assert.Equal(t, "default_value", GetString("default_key"))
-}
-
-func TestGlobalString(t *testing.T) {
-	// Clear any existing global config and set some test values
-	Set("key1", "value1")
-	Set("key2", 42)
-
-	str := String()
-	assert.NotEmpty(t, str)
-	assert.Contains(t, str, "key1: value1")
-	assert.Contains(t, str, "key2: 42")
-}
-
 // Tests for config.go functions with 0% coverage
 func TestConfig_LoadFromMap(t *testing.T) {
 	c, err := New()
@@ -700,15 +522,6 @@ func TestNewWithOptions(t *testing.T) {
 	c, err := New(validOption)
 	assert.NoError(t, err)
 	assert.Equal(t, "option_value", c.GetString("option_key"))
-}
-
-func TestInitGlobalConfigPanic(t *testing.T) {
-	// This is hard to test since it would require causing New() to fail
-	// and we can't easily reset the sync.Once. The current implementation
-	// should not panic under normal circumstances, but we can at least
-	// ensure initGlobalConfig doesn't panic when called multiple times
-	initGlobalConfig()
-	initGlobalConfig() // Should not panic on second call
 }
 
 // Additional parseINI edge cases to improve coverage
@@ -819,7 +632,7 @@ func TestConfig_TypeConversions(t *testing.T) {
 
 	// Test GetDuration with float64
 	c.Set("duration_float", 30.5)
-	assert.Equal(t, 30*time.Second, c.GetDuration("duration_float"))
+	assert.Equal(t, time.Duration(30.5*float64(time.Second)), c.GetDuration("duration_float"))
 
 	c.Set("duration_int64", int64(45))
 	assert.Equal(t, 45*time.Second, c.GetDuration("duration_int64"))
@@ -833,22 +646,633 @@ func TestConfig_TypeConversions(t *testing.T) {
 	assert.Equal(t, []string{"a", "1", "true"}, result)
 }
 
-func BenchmarkConfig_LoadFromFile(b *testing.B) {
+func TestConfig_ParseINI_Sections(t *testing.T) {
+	iniContent := `
+# Global settings
+global_key=global_value
+debug=true
+
+[server]
+host=localhost
+port=8080
+ssl_enabled=true
+
+[database]
+host=db.example.com
+port=5432
+name=testdb
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	// Test global keys
+	assert.Equal(t, "global_value", c.GetString("global_key"))
+	assert.True(t, c.GetBool("debug"))
+
+	// Test nested section access
+	assert.Equal(t, "localhost", c.GetString("server.host"))
+	assert.Equal(t, 8080, c.GetInt("server.port"))
+	assert.True(t, c.GetBool("server.ssl_enabled"))
+
+	assert.Equal(t, "db.example.com", c.GetString("database.host"))
+	assert.Equal(t, 5432, c.GetInt("database.port"))
+	assert.Equal(t, "testdb", c.GetString("database.name"))
+}
+
+func TestConfig_ParseINI_QuotedValues(t *testing.T) {
+	iniContent := `
+[test]
+double_quoted="value with spaces"
+single_quoted='another value'
+quoted_with_quotes="value with \"inner quotes\""
+escape_sequences="line1\nline2\ttab"
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "value with spaces", c.GetString("test.double_quoted"))
+	assert.Equal(t, "another value", c.GetString("test.single_quoted"))
+	assert.Equal(t, "value with \"inner quotes\"", c.GetString("test.quoted_with_quotes"))
+	assert.Equal(t, "line1\nline2\ttab", c.GetString("test.escape_sequences"))
+}
+
+func TestConfig_ParseINI_BooleanValues(t *testing.T) {
+	iniContent := `
+[booleans]
+true1=true
+true2=yes
+true3=on
+true4=1
+false1=false
+false2=no
+false3=off
+false4=0
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	// Test true values
+	assert.True(t, c.GetBool("booleans.true1"))
+	assert.True(t, c.GetBool("booleans.true2"))
+	assert.True(t, c.GetBool("booleans.true3"))
+	assert.True(t, c.GetBool("booleans.true4"))
+
+	// Test false values
+	assert.False(t, c.GetBool("booleans.false1"))
+	assert.False(t, c.GetBool("booleans.false2"))
+	assert.False(t, c.GetBool("booleans.false3"))
+	assert.False(t, c.GetBool("booleans.false4"))
+}
+
+func TestConfig_ParseINI_NumericValues(t *testing.T) {
+	iniContent := `
+[numbers]
+integer=42
+negative=-273
+float=3.14159
+scientific=1.23e-4
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 42, c.GetInt("numbers.integer"))
+	assert.Equal(t, -273, c.GetInt("numbers.negative"))
+	assert.Equal(t, 3.14159, c.GetFloat64("numbers.float"))
+	assert.Equal(t, 1.23e-4, c.GetFloat64("numbers.scientific"))
+}
+
+func TestConfig_ParseINI_Lists(t *testing.T) {
+	iniContent := `
+[lists]
+simple_list=item1,item2,item3
+spaced_list=item 1, item 2, item 3
+mixed_list=string,123,true,false
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	simpleList := c.GetStringSlice("lists.simple_list")
+	assert.Equal(t, []string{"item1", "item2", "item3"}, simpleList)
+
+	spacedList := c.GetStringSlice("lists.spaced_list")
+	assert.Equal(t, []string{"item 1", "item 2", "item 3"}, spacedList)
+
+	mixedList := c.GetStringSlice("lists.mixed_list")
+	assert.Equal(t, []string{"string", "123", "true", "false"}, mixedList)
+}
+
+func TestConfig_ParseINI_MultilineValues(t *testing.T) {
+	iniContent := `
+[multiline]
+continued_value=line1 \
+    line2 \
+    line3
+normal_value=single_line
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "line1 line2 line3", c.GetString("multiline.continued_value"))
+	assert.Equal(t, "single_line", c.GetString("multiline.normal_value"))
+}
+
+func TestConfig_ParseINI_Comments(t *testing.T) {
+	iniContent := `
+# This is a comment
+; This is also a comment
+key1=value1 # inline comment
+key2=value2 ; inline comment
+; key3=commented_out
+
+[section]
+key4=value4
+# key5=commented_out
+key6="quoted value # not a comment"
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "value1", c.GetString("key1"))
+	assert.Equal(t, "value2", c.GetString("key2"))
+	assert.False(t, c.Has("key3"))
+
+	assert.Equal(t, "value4", c.GetString("section.key4"))
+	assert.False(t, c.Has("section.key5"))
+	assert.Equal(t, "quoted value # not a comment", c.GetString("section.key6"))
+}
+
+func TestConfig_ParseINI_InvalidSections(t *testing.T) {
+	iniContent := `
+[valid_section]
+key1=value1
+
+[]
+key2=value2
+
+[invalid[section]]
+key3=value3
+
+[section_with=equals]
+key4=value4
+
+[valid_section2]
+key5=value5
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	// Valid sections should work
+	assert.Equal(t, "value1", c.GetString("valid_section.key1"))
+	assert.Equal(t, "value5", c.GetString("valid_section2.key5"))
+
+	// Invalid sections should be ignored
+	assert.False(t, c.Has("key2")) // Empty section name
+	assert.False(t, c.Has("key3")) // Invalid characters
+	assert.False(t, c.Has("key4")) // Invalid characters
+}
+
+func TestConfig_ParseINI_EmptyValues(t *testing.T) {
+	iniContent := `
+[test]
+empty_value=
+whitespace_only=   
+quoted_empty=""
+quoted_whitespace="   "
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", c.GetString("test.empty_value"))
+	assert.Equal(t, "", c.GetString("test.whitespace_only"))
+	assert.Equal(t, "", c.GetString("test.quoted_empty"))
+	assert.Equal(t, "   ", c.GetString("test.quoted_whitespace"))
+}
+
+func TestConfig_ParseINI_NestedMapAccess(t *testing.T) {
+	iniContent := `
+[database]
+host=localhost
+port=5432
+
+[cache]
+enabled=true
+ttl=3600
+`
+
+	tempFile, err := os.CreateTemp("", "config_*.ini")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte(iniContent))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	c, err := New()
+	require.NoError(t, err)
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.NoError(t, err)
+
+	// Test nested map access
+	dbMap := c.GetNestedMap("database")
+	assert.NotNil(t, dbMap)
+	assert.Equal(t, "localhost", dbMap["host"])
+	assert.Equal(t, 5432, dbMap["port"])
+
+	cacheMap := c.GetNestedMap("cache")
+	assert.NotNil(t, cacheMap)
+	assert.Equal(t, true, cacheMap["enabled"])
+	assert.Equal(t, 3600, cacheMap["ttl"])
+
+	// Test nested keys
+	dbKeys := c.GetNestedKeys("database")
+	assert.Contains(t, dbKeys, "database.host")
+	assert.Contains(t, dbKeys, "database.port")
+}
+
+// TestConfig_Has_EdgeCases tests edge cases for Has method
+func TestConfig_Has_EdgeCases(t *testing.T) {
+	// Test with nil config
+	var c *Config
+	assert.False(t, c.Has("any_key"))
+
+	// Test with empty config
+	c, err := New()
+	require.NoError(t, err)
+	assert.False(t, c.Has(""))
+	assert.False(t, c.Has("nonexistent"))
+
+	// Test with nested keys
+	c.LoadFromMap(map[string]any{
+		"flat_key": "value",
+		"nested": map[string]any{
+			"key": "value",
+		},
+	})
+	assert.True(t, c.Has("flat_key"))
+	assert.True(t, c.Has("nested.key"))
+	assert.False(t, c.Has("nested.nonexistent"))
+}
+
+// TestConfig_Size_EdgeCases tests edge cases for Size method
+func TestConfig_Size_EdgeCases(t *testing.T) {
+	// Test with nil config
+	var c *Config
+	assert.Equal(t, 0, c.Size())
+
+	// Test with empty config
+	c, err := New()
+	require.NoError(t, err)
+	assert.Equal(t, 0, c.Size())
+
+	// Test after adding and removing data
+	c.Set("key", "value")
+	assert.Equal(t, 1, c.Size())
+	c.Clear()
+	assert.Equal(t, 0, c.Size())
+}
+
+// TestConfig_IsEmpty_EdgeCases tests edge cases for IsEmpty method
+func TestConfig_IsEmpty_EdgeCases(t *testing.T) {
+	// Test with nil config
+	var c *Config
+	assert.True(t, c.IsEmpty())
+
+	// Test with empty config
+	c, err := New()
+	require.NoError(t, err)
+	assert.True(t, c.IsEmpty())
+
+	// Test after adding data
+	c.Set("key", "value")
+	assert.False(t, c.IsEmpty())
+
+	// Test after clearing
+	c.Clear()
+	assert.True(t, c.IsEmpty())
+}
+
+// TestConfig_String_EdgeCases tests edge cases for String method
+func TestConfig_String_EdgeCases(t *testing.T) {
+	// Test with nil config
+	var c *Config
+	assert.Equal(t, "Config is nil", c.String())
+
+	// Test with empty config
+	c, err := New()
+	require.NoError(t, err)
+	assert.Equal(t, "", c.String())
+}
+
+// TestConfig_LoadFromFile_ErrorCases tests additional error cases
+func TestConfig_LoadFromFile_ErrorCases(t *testing.T) {
+	c, err := New()
+	require.NoError(t, err)
+
+	// Test with nonexistent file
+	err = c.LoadFromFile("nonexistent.json", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "nonexistent.json")
+
+	// Test with invalid JSON
+	tempFile, err := os.CreateTemp("", "invalid_*.json")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write([]byte("{invalid json"))
+	require.NoError(t, err)
+	tempFile.Close()
+
+	err = c.LoadFromFile(tempFile.Name(), nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse JSON config")
+}
+
+// Benchmark Tests for config.go functions
+
+func BenchmarkNew(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, err := New()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkConfig_LoadFromFile_JSON(b *testing.B) {
+	// Create a test JSON file
 	configData := map[string]interface{}{
 		"server_port": 8080,
 		"debug_mode":  true,
-		"timeout":     30,
+		"timeout":     30.5,
+		"app_name":    "test-app",
+		"features":    []string{"auth", "api", "web"},
+		"database": map[string]interface{}{
+			"host": "localhost",
+			"port": 5432,
+		},
 	}
 
-	jsonData, _ := json.Marshal(configData)
-	tempFile, _ := os.CreateTemp("", "config_*.json")
+	jsonData, err := json.Marshal(configData)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	tempFile, err := os.CreateTemp("", "bench_config_*.json")
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer os.Remove(tempFile.Name())
-	tempFile.Write(jsonData)
+
+	_, err = tempFile.Write(jsonData)
+	if err != nil {
+		b.Fatal(err)
+	}
 	tempFile.Close()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c, _ := New()
-		_ = c.LoadFromFile(tempFile.Name(), nil)
+		c, err := New()
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = c.LoadFromFile(tempFile.Name(), nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkConfig_LoadFromMap(b *testing.B) {
+	data := map[string]any{
+		"key1": "value1",
+		"key2": 42,
+		"key3": true,
+		"nested": map[string]any{
+			"subkey": "subvalue",
+		},
+	}
+
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.LoadFromMap(data)
+	}
+}
+
+func BenchmarkConfig_Has(b *testing.B) {
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	c.LoadFromMap(map[string]any{
+		"existing_key": "value",
+		"nested": map[string]any{
+			"key": "value",
+		},
+	})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.Has("existing_key")
+		c.Has("nonexistent_key")
+		c.Has("nested.key")
+	}
+}
+
+func BenchmarkConfig_Keys(b *testing.B) {
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// Add multiple keys
+	for i := 0; i < 100; i++ {
+		c.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.Keys()
+	}
+}
+
+func BenchmarkConfig_Size(b *testing.B) {
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	c.LoadFromMap(map[string]any{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.Size()
+	}
+}
+
+func BenchmarkConfig_IsEmpty(b *testing.B) {
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.IsEmpty()
+	}
+}
+
+func BenchmarkConfig_Clear(b *testing.B) {
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	data := map[string]any{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.LoadFromMap(data)
+		c.Clear()
+	}
+}
+
+func BenchmarkConfig_String(b *testing.B) {
+	c, err := New()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	c.LoadFromMap(map[string]any{
+		"key1": "value1",
+		"key2": 42,
+		"key3": true,
+	})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.String()
 	}
 }

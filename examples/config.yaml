@@ -1,18 +1,12 @@
-server:
-  host: localhost
-  port: 8080
-  debug: true
-
+app_name: YamlApp
+server_port: 8081
+debug_mode: false
 database:
-  host: db.example.com
+  host: yaml-db.example.com
   port: 5432
-  name: myapp
-  ssl: false
-
+  name: yamlapp
 features:
   - auth
   - api
-  - web
-
-timeout: 30s
-max_connections: 100
+  - dashboard
+timeout: 45s
